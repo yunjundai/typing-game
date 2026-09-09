@@ -1,7 +1,7 @@
 // 🌐 Google Apps Script 部署後的 Web App URL
 // 請在完成 Apps Script 部署後，將您的 Web App 網址貼於此處：
 // 例如: const API_URL = 'https://script.google.com/macros/s/AKfycbx.../exec';
-const API_URL = 'https://script.google.com/macros/s/AKfycby-YOUR-DEPLOYMENT-ID/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzZ4FBD1roKxOceFCzqC3ze6nfC7jkv8ywoJ2ZnvYJfLRJGqxm_bhmTkVuiQvUF8ptL7Q/exec';
 
 // 後端 API 發送輔助函式（支援 GET 與 POST，處理 CORS 與 Apps Script 重定向）
 async function apiRequest(action, data = {}, method = 'GET') {
