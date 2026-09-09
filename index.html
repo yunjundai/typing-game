@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎮 帳號密碼練習遊戲</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+
+<!-- ═══════════════ 畫面一：歡迎 & 選擇班級 ═══════════════ -->
+<section id="screen-welcome" class="screen active">
+    <div class="container">
+        <div class="top-nav-bar">
+            <button class="btn-admin-link" onclick="goToAdmin()">⚙️ 教師管理後台</button>
+        </div>
+        <h1 class="title">🎮 帳號密碼練習遊戲</h1>
+        <p class="subtitle">選擇你的班級開始練習！</p>
+
+        <div class="grade-section">
+            <h2 class="grade-title grade-3">🔵 三年級</h2>
+            <div id="classes-grade-3" class="class-grid"></div>
+        </div>
+        <div class="grade-section">
+            <h2 class="grade-title grade-4">🟢 四年級</h2>
+            <div id="classes-grade-4" class="class-grid"></div>
+        </div>
+        <div class="grade-section">
+            <h2 class="grade-title grade-5">🟠 五年級</h2>
+            <div id="classes-grade-5" class="class-grid"></div>
+        </div>
+        <div class="grade-section">
+            <h2 class="grade-title grade-6">🟣 六年級</h2>
+            <div id="classes-grade-6" class="class-grid"></div>
+        </div>
+
+        <button class="btn btn-outline btn-leaderboard-nav" onclick="showLeaderboard()">
+            🏆 查看排行榜
+        </button>
+    </div>
+</section>
+
+<!-- ═══════════════ 畫面二：選擇學生 ═══════════════ -->
+<section id="screen-students" class="screen">
+    <div class="container">
+        <button class="btn-back" onclick="showScreen('screen-welcome')">← 返回</button>
+        <h1 class="title" id="class-title">301</h1>
+        <p class="subtitle">點擊你的名字</p>
+        <div id="student-grid" class="student-grid"></div>
+    </div>
+</section>
+
+<!-- ═══════════════ 畫面三：選擇時間 ═══════════════ -->
+<section id="screen-settings" class="screen">
+    <div class="container">
+        <button class="btn-back" onclick="showScreen('screen-students')">← 返回</button>
+        <h1 class="title">⏱️ 選擇挑戰時間</h1>
+        <p class="subtitle" id="player-greeting">你好，陳堂宇！</p>
+
+        <div class="time-options">
+            <div class="time-card" onclick="startGame(60)">
+                <div class="time-emoji">🌟</div>
+                <div class="time-value">1 分鐘</div>
+                <div class="time-desc">快速挑戰</div>
+            </div>
+            <div class="time-card" onclick="startGame(180)">
+                <div class="time-emoji">⚡</div>
+                <div class="time-value">3 分鐘</div>
+                <div class="time-desc">標準模式</div>
+            </div>
+            <div class="time-card" onclick="startGame(300)">
+                <div class="time-emoji">🔥</div>
+                <div class="time-value">5 分鐘</div>
+                <div class="time-desc">耐力挑戰</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ 畫面四：遊戲進行中 ═══════════════ -->
+<section id="screen-game" class="screen">
+    <div class="game-container">
+        <!-- 計時條 -->
+        <div class="timer-bar-wrapper">
+            <div id="timer-bar" class="timer-bar"></div>
+        </div>
+
+        <!-- 時間顯示 -->
+        <div class="timer-display">
+            <span id="timer-text" class="timer-text">01:00</span>
+        </div>
+
+        <!-- 遊戲主區域 -->
+        <div class="game-main">
+            <!-- 步驟指示 -->
+            <div class="step-indicator">
+                <span id="step-account" class="step active">① 帳號</span>
+                <span class="step-arrow">→</span>
+                <span id="step-password" class="step">② 密碼</span>
+            </div>
+
+            <!-- 提示文字 -->
+            <h2 id="game-prompt" class="game-prompt">請輸入你的帳號</h2>
+            <p id="game-format-hint" class="format-hint">格式：cjesXXXXXX@cjes.hcc.edu.tw</p>
+
+            <!-- 輸入區域 -->
+            <div class="input-wrapper" id="input-wrapper">
+                <input
+                    type="text"
+                    id="game-input"
+                    class="game-input"
+                    autocomplete="off"
+                    autocapitalize="off"
+                    autocorrect="off"
+                    spellcheck="false"
+                    placeholder="在這裡輸入..."
+                >
+                <button type="button" id="btn-toggle-pwd" class="btn-toggle-pwd" onclick="togglePasswordVisibility()" title="顯示/隱藏密碼" style="display: none;">
+                    👁️
+                </button>
+                <span id="char-counter" class="char-counter">0 / ? 字元</span>
+            </div>
+
+            <!-- 提示按鈕 -->
+            <div id="hint-area" class="hint-area" style="display: none;">
+                <button class="btn btn-hint" onclick="requestHint()">💡 給我提示</button>
+                <p id="hint-text" class="hint-text"></p>
+            </div>
+
+            <!-- 回饋訊息 -->
+            <div id="feedback" class="feedback"></div>
+        </div>
+
+        <!-- 底部統計 -->
+        <div class="stats-panel">
+            <div class="stat-item">
+                <div class="stat-value" id="stat-score">0</div>
+                <div class="stat-label">🏆 分數</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-rounds">0</div>
+                <div class="stat-label">🔄 完成</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-accuracy">100%</div>
+                <div class="stat-label">🎯 正確率</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ 畫面五：結算 ═══════════════ -->
+<section id="screen-results" class="screen">
+    <div class="container">
+        <h1 class="title">🎉 時間到！</h1>
+
+        <div class="result-card">
+            <div class="result-stars" id="result-stars">⭐⭐⭐</div>
+            <div class="result-grid">
+                <div class="result-item">
+                    <div class="result-value" id="result-score">0</div>
+                    <div class="result-label">總分</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-value" id="result-rounds">0</div>
+                    <div class="result-label">完成次數</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-value" id="result-accuracy">0%</div>
+                    <div class="result-label">正確率</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-value" id="result-time">1 分鐘</div>
+                    <div class="result-label">挑戰時間</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="result-actions">
+            <button class="btn btn-primary btn-lg" onclick="replayGame()">🔄 再玩一次</button>
+            <button class="btn btn-secondary btn-lg" onclick="showLeaderboard()">🏆 排行榜</button>
+            <button class="btn btn-outline btn-lg" onclick="showScreen('screen-welcome')">🏠 回首頁</button>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ 畫面六：排行榜 ═══════════════ -->
+<section id="screen-leaderboard" class="screen">
+    <div class="container">
+        <button class="btn-back" onclick="goBackFromLeaderboard()">← 返回</button>
+        <h1 class="title">🏆 排行榜</h1>
+
+        <!-- 年級篩選 -->
+        <div class="filter-group">
+            <button class="filter-btn active" data-grade="all" onclick="filterGrade('all', this)">全部</button>
+            <button class="filter-btn" data-grade="3" onclick="filterGrade('3', this)">三年級</button>
+            <button class="filter-btn" data-grade="4" onclick="filterGrade('4', this)">四年級</button>
+            <button class="filter-btn" data-grade="5" onclick="filterGrade('5', this)">五年級</button>
+            <button class="filter-btn" data-grade="6" onclick="filterGrade('6', this)">六年級</button>
+        </div>
+
+        <!-- 時間篩選 -->
+        <div class="filter-group">
+            <button class="filter-btn time-btn active" data-time="60" onclick="filterTime(60, this)">1 分鐘</button>
+            <button class="filter-btn time-btn" data-time="180" onclick="filterTime(180, this)">3 分鐘</button>
+            <button class="filter-btn time-btn" data-time="300" onclick="filterTime(300, this)">5 分鐘</button>
+        </div>
+
+        <!-- 排行榜表格 -->
+        <div class="leaderboard-wrapper">
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>排名</th>
+                        <th>班級</th>
+                        <th>姓名</th>
+                        <th>分數</th>
+                        <th>完成次數</th>
+                        <th>正確率</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-body">
+                    <tr><td colspan="6" class="empty-msg">目前還沒有成績，快去挑戰吧！</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ 畫面七：教師後台登入 ═══════════════ -->
+<section id="screen-admin-login" class="screen">
+    <div class="container" style="max-width: 440px; text-align: center;">
+        <h1 class="title">🔐 教師管理後台</h1>
+        <p class="subtitle">請輸入管理員通行密碼</p>
+        
+        <div style="margin: 24px 0;">
+            <input type="password" id="admin-password-input" class="game-input" placeholder="請輸入管理密碼..." style="font-size: 1.2rem;">
+        </div>
+
+        <div id="login-feedback" class="feedback"></div>
+
+        <button class="btn btn-primary btn-lg" style="width: 100%; margin-top: 14px;" onclick="doAdminLogin()">
+            進入管理系統
+        </button>
+        <div style="margin-top: 16px;">
+            <button class="btn-back" onclick="showScreen('screen-welcome')">← 返回遊戲首頁</button>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ 畫面八：教師管理面板 ═══════════════ -->
+<section id="screen-admin-dashboard" class="screen">
+    <div class="container" style="max-width: 1000px;">
+        <div class="admin-header">
+            <div>
+                <h1 style="font-size: 1.8rem; color: #2d3436;">⚙️ 學生帳號密碼管理面板 <span id="student-count" class="tag-count">0 人</span></h1>
+                <p style="color: #636e72; font-size: 0.95rem; margin-top: 4px;">可直接查詢、新增或刪除學生資料</p>
+            </div>
+            <div>
+                <button class="btn btn-primary" onclick="openAddModal()">➕ 新增學生</button>
+                <button class="btn btn-outline" style="margin-left: 8px;" onclick="showScreen('screen-welcome')">🎮 返回遊戲</button>
+            </div>
+        </div>
+
+        <!-- 篩選與搜尋工具列 -->
+        <div class="admin-controls">
+            <select id="filter-class" class="select-input" onchange="filterStudents()">
+                <option value="all">全部班級</option>
+            </select>
+            <input type="text" id="search-name" class="search-input" placeholder="🔍 搜尋姓名、座號或帳號..." oninput="filterStudents()">
+            <button class="btn btn-secondary" onclick="loadAllStudents()">🔄 重新整理</button>
+        </div>
+
+        <!-- 學生資料表格 -->
+        <div class="admin-table-wrapper">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>班級</th>
+                        <th>座號</th>
+                        <th>姓名</th>
+                        <th>cjes 帳號</th>
+                        <th>cjes 密碼</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-tbody">
+                    <tr><td colspan="7" style="padding: 30px; color: #b2bec3;">載入中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ 新增學生彈窗 ═══════════════ -->
+<div id="add-modal" class="modal">
+    <div class="modal-content">
+        <h2 style="margin-bottom: 16px; color: #2d3436;">➕ 新增學生</h2>
+        <div class="form-group">
+            <label>班級（例如：301）</label>
+            <input type="text" id="new-class" placeholder="301">
+        </div>
+        <div class="form-group">
+            <label>座號（例如：01）</label>
+            <input type="text" id="new-seat" placeholder="01">
+        </div>
+        <div class="form-group">
+            <label>姓名</label>
+            <input type="text" id="new-name" placeholder="學生姓名">
+        </div>
+        <div class="form-group">
+            <label>cjes 帳號</label>
+            <input type="text" id="new-account" placeholder="cjes113xxx@cjes.hcc.edu.tw">
+        </div>
+        <div class="form-group">
+            <label>cjes 密碼</label>
+            <input type="text" id="new-password" placeholder="密碼">
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeAddModal()">取消</button>
+            <button class="btn btn-primary" onclick="submitAddStudent()">儲存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 引入設定檔與主程式 -->
+<script src="static/js/config.js"></script>
+<script src="static/js/main.js"></script>
+<script src="static/js/admin.js"></script>
+</body>
+</html>

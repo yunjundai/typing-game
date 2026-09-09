@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚙️ 教師管理後台 — 帳號密碼遊戲</title>
+    <link rel="stylesheet" href="static/css/style.css">
+    <style>
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #edf2f7;
+        }
+        .admin-controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        .search-input, .select-input {
+            padding: 10px 14px;
+            border: 2px solid #dfe6e9;
+            border-radius: 10px;
+            font-size: 1rem;
+            outline: none;
+        }
+        .search-input:focus, .select-input:focus {
+            border-color: #6c5ce7;
+        }
+        .admin-table-wrapper {
+            overflow-x: auto;
+            max-height: 520px;
+            border-radius: 12px;
+            border: 1px solid #dfe6e9;
+        }
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+        .admin-table th {
+            position: sticky;
+            top: 0;
+            background: #f1f2f6;
+            padding: 12px;
+            font-weight: 700;
+            color: #2d3436;
+            border-bottom: 2px solid #dcdde1;
+            z-index: 10;
+        }
+        .admin-table td {
+            padding: 10px 12px;
+            text-align: center;
+            border-bottom: 1px solid #f1f2f6;
+        }
+        .admin-table tr:hover {
+            background: #f8f7ff;
+        }
+        .btn-copy {
+            background: #edf2f7;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            margin-left: 6px;
+            color: #4a5568;
+        }
+        .btn-copy:hover {
+            background: #cbd5e0;
+        }
+        .btn-del {
+            background: #ff7675;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .btn-del:hover {
+            background: #d63031;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 18px;
+            padding: 28px;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .form-group {
+            margin-bottom: 14px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: #2d3436;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #dfe6e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+        }
+        .form-group input:focus {
+            border-color: #6c5ce7;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        .tag-count {
+            background: #6c5ce7;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════ 登入畫面 ═══════════════ -->
+<section id="screen-login" class="screen active">
+    <div class="container" style="max-width: 440px; text-align: center;">
+        <h1 class="title">🔐 教師管理後台</h1>
+        <p class="subtitle">請輸入管理員通行密碼</p>
+        
+        <div style="margin: 24px 0;">
+            <input type="password" id="admin-password-input" class="game-input" placeholder="請輸入管理密碼..." style="font-size: 1.2rem;">
+        </div>
+
+        <div id="login-feedback" class="feedback"></div>
+
+        <button class="btn btn-primary btn-lg" style="width: 100%; margin-top: 14px;" onclick="doAdminLogin()">
+            進入管理系統
+        </button>
+        <div style="margin-top: 16px;">
+            <a href="index.html" style="color: #6c5ce7; text-decoration: none; font-size: 0.95rem;">← 返回遊戲主頁</a>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ 管理儀表板 ═══════════════ -->
+<section id="screen-dashboard" class="screen">
+    <div class="container" style="max-width: 1000px;">
+        <div class="admin-header">
+            <div>
+                <h1 style="font-size: 1.8rem; color: #2d3436;">⚙️ 學生帳號密碼管理面板 <span id="student-count" class="tag-count">0 人</span></h1>
+                <p style="color: #636e72; font-size: 0.95rem; margin-top: 4px;">可直接查詢、新增或刪除學生資料</p>
+            </div>
+            <div>
+                <button class="btn btn-primary" onclick="openAddModal()">➕ 新增學生</button>
+                <a href="index.html" class="btn btn-outline" style="text-decoration: none; margin-left: 8px;">🎮 回到遊戲</a>
+            </div>
+        </div>
+
+        <!-- 篩選與搜尋工具列 -->
+        <div class="admin-controls">
+            <select id="filter-class" class="select-input" onchange="filterStudents()">
+                <option value="all">全部班級</option>
+            </select>
+            <input type="text" id="search-name" class="search-input" placeholder="🔍 搜尋姓名或帳號..." oninput="filterStudents()">
+            <button class="btn btn-secondary" onclick="loadAllStudents()">🔄 重新整理</button>
+        </div>
+
+        <!-- 學生資料表格 -->
+        <div class="admin-table-wrapper">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>班級</th>
+                        <th>座號</th>
+                        <th>姓名</th>
+                        <th>cjes 帳號</th>
+                        <th>cjes 密碼</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-tbody">
+                    <tr><td colspan="7" style="padding: 30px; color: #b2bec3;">載入中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════ 新增學生彈窗 ═══════════════ -->
+<div id="add-modal" class="modal">
+    <div class="modal-content">
+        <h2 style="margin-bottom: 16px; color: #2d3436;">➕ 新增學生</h2>
+        <div class="form-group">
+            <label>班級（例如：301）</label>
+            <input type="text" id="new-class" placeholder="301">
+        </div>
+        <div class="form-group">
+            <label>座號（例如：01）</label>
+            <input type="text" id="new-seat" placeholder="01">
+        </div>
+        <div class="form-group">
+            <label>姓名</label>
+            <input type="text" id="new-name" placeholder="學生姓名">
+        </div>
+        <div class="form-group">
+            <label>cjes 帳號</label>
+            <input type="text" id="new-account" placeholder="cjes113xxx@cjes.hcc.edu.tw">
+        </div>
+        <div class="form-group">
+            <label>cjes 密碼</label>
+            <input type="text" id="new-password" placeholder="密碼">
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeAddModal()">取消</button>
+            <button class="btn btn-primary" onclick="submitAddStudent()">儲存</button>
+        </div>
+    </div>
+</div>
+
+<script src="static/js/config.js"></script>
+<script src="static/js/admin.js"></script>
+</body>
+</html>
