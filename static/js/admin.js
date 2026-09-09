@@ -41,31 +41,12 @@ async function doAdminLogin() {
         return;
     }
 
-    try {
-        let result = {};
-        if (typeof API_URL !== 'undefined' && !API_URL.includes('YOUR-DEPLOYMENT-ID')) {
-            result = await apiRequest('adminLogin', { password: password }, 'POST');
-        } else {
-            // 本地 Flask 模式
-            const res = await fetch('/api/admin/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: password })
-            });
-            result = await res.json();
-        }
-
-        if (result.success) {
-            currentAdminPassword = password;
-            showScreen('screen-admin-dashboard');
-            loadAllStudents();
-        } else {
-            feedback.textContent = '❌ ' + (result.error || '密碼錯誤！');
-            feedback.className = 'feedback wrong';
-        }
-    } catch (err) {
-        console.error('登入出錯:', err);
-        feedback.textContent = '連線失敗，請檢查網路或 API 設置！';
+    if (password === '5552472') {
+        currentAdminPassword = password;
+        showScreen('screen-admin-dashboard');
+        loadAllStudents();
+    } else {
+        feedback.textContent = '❌ 密碼錯誤！';
         feedback.className = 'feedback wrong';
     }
 }
@@ -76,24 +57,35 @@ async function loadAllStudents() {
     tbody.innerHTML = '<tr><td colspan="7" style="padding: 30px; color: #b2bec3;">資料載入中...</td></tr>';
 
     try {
-        let result = {};
-        if (typeof API_URL !== 'undefined' && !API_URL.includes('YOUR-DEPLOYMENT-ID')) {
-            result = await apiRequest('adminStudents', { password: currentAdminPassword, class: 'all' }, 'POST');
+        if (isSupabaseConfigured()) {
+            // ⚡ Supabase 極速查詢所有學生（支援即時排序）
+            const { data, error } = await supabaseClient
+                .from('students')
+                .select('id, class_name, seat_number, name, cjes_account, cjes_password')
+                .order('class_name', { ascending: true })
+                .order('seat_number', { ascending: true });
+
+            if (!error && data) {
+                allStudentsList = data;
+                updateClassFilterOptions();
+                filterStudents();
+            } else {
+                tbody.innerHTML = `<tr><td colspan="7" style="color: #d63031;">載入失敗: ${error ? error.message : '未知錯誤'}</td></tr>`;
+            }
         } else {
             const res = await fetch('/api/admin/students', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ password: currentAdminPassword })
             });
-            result = await res.json();
-        }
-
-        if (result.success) {
-            allStudentsList = result.data || [];
-            updateClassFilterOptions();
-            filterStudents();
-        } else {
-            tbody.innerHTML = `<tr><td colspan="7" style="color: #d63031;">載入失敗: ${result.error}</td></tr>`;
+            const result = await res.json();
+            if (result.success) {
+                allStudentsList = result.data || [];
+                updateClassFilterOptions();
+                filterStudents();
+            } else {
+                tbody.innerHTML = `<tr><td colspan="7" style="color: #d63031;">載入失敗: ${result.error}</td></tr>`;
+            }
         }
     } catch (err) {
         console.error('載入學生失敗:', err);
@@ -200,39 +192,61 @@ async function submitAddStudent() {
         return;
     }
 
-    const newStudent = {
-        class_name: className,
-        seat_number: seatNum,
-        name: name,
-        cjes_account: account,
-        cjes_password: password
-    };
-
     try {
-        let result = {};
-        if (typeof API_URL !== 'undefined' && !API_URL.includes('YOUR-DEPLOYMENT-ID')) {
-            result = await apiRequest('addStudent', {
-                password: currentAdminPassword,
-                student: newStudent
-            }, 'POST');
+        if (isSupabaseConfigured()) {
+            // ⚡ 前端計算安全 Hash 與提示
+            const accHash = await sha256Hex(account);
+            const pwdHash = await sha256Hex(password);
+            const atPos = account.indexOf('@');
+            const accHint = atPos > 4 ? account.substring(0, 4) + '*'.repeat(atPos - 4) + account.substring(atPos) : account;
+            const pwdHint = password.length > 2 ? password[0] + '*'.repeat(password.length - 2) + password[password.length - 1] : password;
+
+            const { error } = await supabaseClient
+                .from('students')
+                .insert([{
+                    class_name: className,
+                    seat_number: seatNum.padStart(2, '0'),
+                    name: name,
+                    cjes_account: account,
+                    cjes_password: password,
+                    acc_hash: accHash,
+                    pwd_hash: pwdHash,
+                    acc_len: account.length,
+                    pwd_len: password.length,
+                    acc_hint: accHint,
+                    pwd_hint: pwdHint
+                }]);
+
+            if (!error) {
+                alert('✅ 學生新增成功！');
+                closeAddModal();
+                loadAllStudents();
+            } else {
+                alert('❌ 新增失敗：' + error.message);
+            }
         } else {
             const res = await fetch('/api/admin/add_student', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     password: currentAdminPassword,
-                    student: newStudent
+                    student: {
+                        class_name: className,
+                        seat_number: seatNum,
+                        name: name,
+                        cjes_account: account,
+                        cjes_password: password
+                    }
                 })
             });
-            result = await res.json();
-        }
-
-        if (result.success) {
-            alert('✅ 學生新增成功！');
-            closeAddModal();
-            loadAllStudents();
-        } else {
-            alert('❌ 新增失敗：' + (result.error || '未知錯誤'));
+            const result = await res.json();
+            if (result.success) {
+                alert('✅ 學生新增成功！');
+                closeAddModal();
+                loadAllStudents();
+            } else {
+                alert('❌ 新增失敗：' + (result.error || '未知錯誤'));
+            }
         }
     } catch (err) {
         console.error('新增失敗:', err);
@@ -247,12 +261,18 @@ async function confirmDeleteStudent(id, name) {
     }
 
     try {
-        let result = {};
-        if (typeof API_URL !== 'undefined' && !API_URL.includes('YOUR-DEPLOYMENT-ID')) {
-            result = await apiRequest('deleteStudent', {
-                password: currentAdminPassword,
-                id: id
-            }, 'POST');
+        if (isSupabaseConfigured()) {
+            const { error } = await supabaseClient
+                .from('students')
+                .delete()
+                .eq('id', id);
+
+            if (!error) {
+                alert('✅ 學生已刪除！');
+                loadAllStudents();
+            } else {
+                alert('❌ 刪除失敗：' + error.message);
+            }
         } else {
             const res = await fetch('/api/admin/delete_student', {
                 method: 'POST',
@@ -262,14 +282,13 @@ async function confirmDeleteStudent(id, name) {
                     id: id
                 })
             });
-            result = await res.json();
-        }
-
-        if (result.success) {
-            alert('✅ 學生已刪除！');
-            loadAllStudents();
-        } else {
-            alert('❌ 刪除失敗：' + (result.error || '未知錯誤'));
+            const result = await res.json();
+            if (result.success) {
+                alert('✅ 學生已刪除！');
+                loadAllStudents();
+            } else {
+                alert('❌ 刪除失敗：' + (result.error || '未知錯誤'));
+            }
         }
     } catch (err) {
         console.error('刪除失敗:', err);

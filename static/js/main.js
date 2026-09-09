@@ -54,9 +54,15 @@ function showScreen(screenId) {
 async function loadClasses() {
     try {
         let classes = [];
-        // 若已設定 Google Apps Script API，則呼叫 apiRequest
-        if (typeof API_URL !== 'undefined' && !API_URL.includes('YOUR-DEPLOYMENT-ID')) {
-            classes = await apiRequest('classes', {}, 'GET');
+        if (isSupabaseConfigured()) {
+            // ⚡ Supabase 極速查詢（耗時僅 20~40ms）
+            const { data, error } = await supabaseClient
+                .from('students')
+                .select('class_name');
+            if (!error && data) {
+                const set = new Set(data.map(d => String(d.class_name).trim()));
+                classes = Array.from(set).sort();
+            }
         } else {
             // 本地 Flask 模式備援
             const res = await fetch('/api/classes');
@@ -70,7 +76,6 @@ async function loadClasses() {
             '6': document.getElementById('classes-grade-6'),
         };
 
-        // 清空
         Object.values(gradeContainers).forEach(c => { if(c) c.innerHTML = ''; });
 
         classes.forEach(className => {
@@ -85,7 +90,6 @@ async function loadClasses() {
             container.appendChild(btn);
         });
 
-        // 隱藏空的年級區塊
         for (const [grade, container] of Object.entries(gradeContainers)) {
             if (!container) continue;
             const section = container.closest('.grade-section');
@@ -110,8 +114,16 @@ async function selectClass(className) {
 
     try {
         let students = [];
-        if (typeof API_URL !== 'undefined' && !API_URL.includes('YOUR-DEPLOYMENT-ID')) {
-            students = await apiRequest('students', { class: className }, 'GET');
+        if (isSupabaseConfigured()) {
+            // ⚡ Supabase 極速拉取該班學生名單（包含 hash，用於秒級離線比對）
+            const { data, error } = await supabaseClient
+                .from('students')
+                .select('id, seat_number, name, acc_hash, pwd_hash, acc_len, pwd_len, acc_hint, pwd_hint')
+                .eq('class_name', className)
+                .order('seat_number', { ascending: true });
+            if (!error && data) {
+                students = data;
+            }
         } else {
             const res = await fetch(`/api/students?class=${className}`);
             students = await res.json();
@@ -653,14 +665,19 @@ async function submitScore(accuracy) {
     try {
         const payload = {
             student_id: state.selectedStudent.id,
+            student_name: state.selectedStudent.name,
+            class_name: state.selectedClass,
             score: state.score,
             rounds: state.rounds,
             accuracy: accuracy,
             time_limit: state.timeLimit,
         };
 
-        if (typeof API_URL !== 'undefined' && !API_URL.includes('YOUR-DEPLOYMENT-ID')) {
-            await apiRequest('submitScore', payload, 'POST');
+        if (isSupabaseConfigured()) {
+            // ⚡ Supabase 極速寫入成績表
+            await supabaseClient
+                .from('scores')
+                .insert([payload]);
         } else {
             await fetch('/api/scores', {
                 method: 'POST',
@@ -720,20 +737,49 @@ function filterTime(time, btn) {
 
 async function loadLeaderboard() {
     try {
-        let data = [];
-        if (typeof API_URL !== 'undefined' && !API_URL.includes('YOUR-DEPLOYMENT-ID')) {
-            data = await apiRequest('leaderboard', {
-                grade: state.leaderboardGrade,
-                time_limit: state.leaderboardTime,
-                limit: 50
-            }, 'GET');
+        let results = [];
+        if (isSupabaseConfigured()) {
+            // ⚡ Supabase 即時排行查詢（毫秒級響應）
+            let query = supabaseClient
+                .from('scores')
+                .select('student_id, student_name, class_name, score, rounds, accuracy, time_limit, created_at')
+                .eq('time_limit', state.leaderboardTime)
+                .order('score', { ascending: false })
+                .order('rounds', { ascending: false });
+
+            if (state.leaderboardGrade !== 'all') {
+                query = query.like('class_name', `${state.leaderboardGrade}%`);
+            }
+
+            const { data, error } = await query.limit(100);
+            if (!error && data) {
+                // 每位學生只取最高分
+                const bestMap = {};
+                for (const row of data) {
+                    if (!bestMap[row.student_id]) {
+                        bestMap[row.student_id] = {
+                            name: row.student_name,
+                            class_name: row.class_name,
+                            score: row.score,
+                            rounds: row.rounds,
+                            accuracy: row.accuracy,
+                            time_limit: row.time_limit,
+                            created_at: row.created_at
+                        };
+                    }
+                }
+                results = Object.values(bestMap).slice(0, 50).map((item, idx) => {
+                    item.rank = idx + 1;
+                    return item;
+                });
+            }
         } else {
             const res = await fetch(
                 `/api/leaderboard?grade=${state.leaderboardGrade}&time_limit=${state.leaderboardTime}&limit=50`
             );
-            data = await res.json();
+            results = await res.json();
         }
-        renderLeaderboard(data);
+        renderLeaderboard(results);
     } catch (err) {
         console.error('載入排行榜失敗:', err);
     }
