@@ -389,11 +389,16 @@ function setupInputHandler() {
     });
 }
 
+let isSubmitting = false;
+
 async function submitInput() {
+    if (isSubmitting) return;
+
     const input = document.getElementById('game-input');
     const value = input.value.trim();
     if (!value) return;
 
+    isSubmitting = true;
     state.totalAttempts++;
 
     try {
@@ -417,15 +422,24 @@ async function submitInput() {
             result = await res.json();
         }
 
-        state.expectedLength = result.expected_length;
+        if (result && result.expected_length) {
+            state.expectedLength = result.expected_length;
+        }
 
-        if (result.correct) {
+        if (result && result.correct) {
             onCorrect();
         } else {
             onWrong();
         }
     } catch (err) {
         console.error('驗證失敗:', err);
+        const feedback = document.getElementById('feedback');
+        if (feedback) {
+            feedback.textContent = '⚠️ 網路連線稍慢，請再試一次！';
+            feedback.className = 'feedback wrong';
+        }
+    } finally {
+        isSubmitting = false;
     }
 }
 
@@ -574,7 +588,9 @@ function endGame() {
     document.getElementById('result-time').textContent =
         timeLabels[state.timeLimit] || state.timeLimit + ' 秒';
 
-    submitScore(accuracy);
+    if (state.score > 0 || state.totalAttempts > 0) {
+        submitScore(accuracy);
+    }
     showScreen('screen-results');
 }
 

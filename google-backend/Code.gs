@@ -42,6 +42,22 @@ function handleRequest(e) {
   const req = Object.assign({}, params, postData);
   const action = req.action;
 
+  // 如果 student 是 JSON 字串，自動解析為物件；或支援扁平欄位
+  if (req.student && typeof req.student === 'string') {
+    try {
+      req.student = JSON.parse(req.student);
+    } catch (e) {}
+  }
+  if (!req.student && req.name && req.cjes_account) {
+    req.student = {
+      class_name: req.class_name,
+      seat_number: req.seat_number,
+      name: req.name,
+      cjes_account: req.cjes_account,
+      cjes_password: req.cjes_password
+    };
+  }
+
   let result = {};
 
   try {
