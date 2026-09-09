@@ -6,9 +6,10 @@ echo "🎮 準備將帳號密碼遊戲推送到 GitHub..."
 echo "倉庫網址: https://github.com/yunjundai/typing-game.git"
 echo "=========================================="
 echo ""
-git push -u origin main
+git push -u origin main --force
 echo ""
 echo "=========================================="
-echo "如果顯示已完成，請前往 GitHub 開啟 Pages："
+echo "🎉 恭喜！已成功強制推送到 GitHub！"
+echo "請前往開啟 GitHub Pages："
 echo "👉 https://github.com/yunjundai/typing-game/settings/pages"
 echo "=========================================="

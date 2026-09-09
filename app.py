@@ -38,18 +38,40 @@ def get_classes():
 
 @app.route('/api/students')
 def get_students():
-    """取得指定班級的學生名單（不含帳密）。"""
+    """取得指定班級的學生名單（包含保護的 hash 用於前端零延遲驗證）。"""
     class_name = request.args.get('class')
     if not class_name:
         return jsonify({'error': '缺少 class 參數'}), 400
 
+    import hashlib
     conn = get_db()
     rows = conn.execute(
-        'SELECT id, seat_number, name FROM students WHERE class_name = ? ORDER BY seat_number',
+        'SELECT id, seat_number, name, cjes_account, cjes_password FROM students WHERE class_name = ? ORDER BY seat_number',
         (class_name,)
     ).fetchall()
     conn.close()
-    return jsonify([dict(r) for r in rows])
+
+    result = []
+    for r in rows:
+        acc = r['cjes_account']
+        pwd = r['cjes_password']
+        at_pos = acc.index('@') if '@' in acc else len(acc)
+        acc_hint = acc[:4] + '*' * max(0, at_pos - 4) + acc[at_pos:]
+        pwd_hint = pwd[0] + '*' * max(0, len(pwd) - 2) + pwd[-1] if len(pwd) > 2 else pwd
+
+        result.append({
+            'id': r['id'],
+            'seat_number': r['seat_number'],
+            'name': r['name'],
+            'acc_hash': hashlib.sha256(acc.strip().encode('utf-8')).hexdigest(),
+            'pwd_hash': hashlib.sha256(pwd.strip().encode('utf-8')).hexdigest(),
+            'acc_len': len(acc.strip()),
+            'pwd_len': len(pwd.strip()),
+            'acc_hint': acc_hint,
+            'pwd_hint': pwd_hint
+        })
+
+    return jsonify(result)
 
 
 @app.route('/api/verify', methods=['POST'])

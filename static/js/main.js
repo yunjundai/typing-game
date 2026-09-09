@@ -389,6 +389,15 @@ function setupInputHandler() {
     });
 }
 
+// ── 前端 SHA-256 計算函式（瀏覽器原生 Web Crypto API，極速且無需額外函式庫）──
+async function sha256Hex(str) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 let isSubmitting = false;
 
 async function submitInput() {
@@ -401,6 +410,36 @@ async function submitInput() {
     isSubmitting = true;
     state.totalAttempts++;
 
+    const stu = state.selectedStudent;
+
+    // ⚡【極速零延遲模式】：若有學生的保護 Hash，直接於前端即時秒驗證（0 延遲，絕無頓挫感）
+    if (stu && ((state.currentField === 'account' && stu.acc_hash) || (state.currentField === 'password' && stu.pwd_hash))) {
+        try {
+            const inputHash = await sha256Hex(value);
+            const targetHash = state.currentField === 'account' ? stu.acc_hash : stu.pwd_hash;
+            const targetLen = state.currentField === 'account' ? (stu.acc_len || 26) : (stu.pwd_len || 11);
+            state.expectedLength = targetLen;
+
+            if (inputHash === targetHash) {
+                onCorrect();
+            } else {
+                onWrong();
+            }
+        } catch (e) {
+            console.error('前端 Hash 比對異常，回退至網路請求:', e);
+            await fallbackVerify(value);
+        } finally {
+            isSubmitting = false;
+        }
+        return;
+    }
+
+    // 🌐【網路備援驗證】
+    await fallbackVerify(value);
+    isSubmitting = false;
+}
+
+async function fallbackVerify(value) {
     try {
         let result = {};
         if (typeof API_URL !== 'undefined' && !API_URL.includes('YOUR-DEPLOYMENT-ID')) {
@@ -408,7 +447,7 @@ async function submitInput() {
                 student_id: state.selectedStudent.id,
                 field: state.currentField,
                 input: value,
-            }, 'POST');
+            }, 'GET');
         } else {
             const res = await fetch('/api/verify', {
                 method: 'POST',
@@ -438,8 +477,6 @@ async function submitInput() {
             feedback.textContent = '⚠️ 網路連線稍慢，請再試一次！';
             feedback.className = 'feedback wrong';
         }
-    } finally {
-        isSubmitting = false;
     }
 }
 
@@ -453,12 +490,13 @@ function onCorrect() {
     const feedback = document.getElementById('feedback');
 
     input.classList.add('correct');
-    feedback.textContent = '✅ 正確！太棒了！';
+    feedback.textContent = '✅ 正確！';
     feedback.className = 'feedback correct';
 
     showScoreFly(wrapper, '+100');
     updateStats();
 
+    // ⚡ 將等待時間從原本 500ms 大幅縮減至 180ms，打字節奏極度絲滑順暢
     setTimeout(() => {
         input.classList.remove('correct');
         input.value = '';
@@ -475,18 +513,20 @@ function onCorrect() {
             state.currentField = 'account';
             updateGameUI();
 
-            feedback.textContent = `🎉 第 ${state.rounds} 輪完成！繼續加油！`;
+            feedback.textContent = `🎉 第 ${state.rounds} 輪完成！`;
             feedback.className = 'feedback correct';
             setTimeout(() => {
-                feedback.textContent = '';
-                feedback.className = 'feedback';
-            }, 1500);
+                if (feedback.textContent.includes('輪完成')) {
+                    feedback.textContent = '';
+                    feedback.className = 'feedback';
+                }
+            }, 1000);
         }
 
         if (state.gameActive) {
             input.focus();
         }
-    }, 500);
+    }, 180);
 }
 
 function onWrong() {
@@ -496,7 +536,7 @@ function onWrong() {
     const feedback = document.getElementById('feedback');
 
     input.classList.add('wrong');
-    feedback.textContent = '❌ 不正確，再試一次！';
+    feedback.textContent = '❌ 再試一次！';
     feedback.className = 'feedback wrong';
 
     updateStats();
@@ -505,6 +545,7 @@ function onWrong() {
         document.getElementById('hint-area').style.display = 'block';
     }
 
+    // ⚡ 錯誤反饋延遲縮減至 200ms
     setTimeout(() => {
         input.classList.remove('wrong');
         input.value = '';
@@ -512,12 +553,26 @@ function onWrong() {
         if (state.gameActive) {
             input.focus();
         }
-    }, 400);
+    }, 200);
 }
 
 // ── 提示功能 ─────────────────────────────────────
 
 async function requestHint() {
+    const stu = state.selectedStudent;
+
+    // ⚡ 本地秒出提示
+    if (stu && ((state.currentField === 'account' && stu.acc_hint) || (state.currentField === 'password' && stu.pwd_hint))) {
+        const hint = state.currentField === 'account' ? stu.acc_hint : stu.pwd_hint;
+        const len = state.currentField === 'account' ? stu.acc_len : stu.pwd_len;
+        const hintText = document.getElementById('hint-text');
+        hintText.textContent = `提示：${hint}（${len} 個字元）`;
+        state.expectedLength = len;
+        const input = document.getElementById('game-input');
+        document.getElementById('char-counter').textContent = `${input.value.length} / ${len} 字元`;
+        return;
+    }
+
     try {
         let data = {};
         if (typeof API_URL !== 'undefined' && !API_URL.includes('YOUR-DEPLOYMENT-ID')) {

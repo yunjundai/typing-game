@@ -145,7 +145,21 @@ function getClasses(ss) {
   return classes;
 }
 
-// 2. 取得指定班級學生（不含帳密，保障隱私）
+// 輔助函式：產生 SHA-256 雜湊
+function computeSha256(text) {
+  const rawHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(text).trim(), Utilities.Charset.UTF_8);
+  let hashStr = "";
+  for (let i = 0; i < rawHash.length; i++) {
+    let byteVal = rawHash[i];
+    if (byteVal < 0) byteVal += 256;
+    let byteHex = byteVal.toString(16);
+    if (byteHex.length === 1) byteHex = "0" + byteHex;
+    hashStr += byteHex;
+  }
+  return hashStr;
+}
+
+// 2. 取得指定班級學生（含保護雜湊，提供前端零延遲即時比對，帳密不外洩）
 function getStudents(ss, className) {
   if (!className) return { error: "缺少 class 參數" };
   const sheet = getStudentsSheet(ss);
@@ -156,10 +170,22 @@ function getStudents(ss, className) {
     const row = data[i];
     const rowClass = String(row[1]).trim();
     if (rowClass === String(className).trim()) {
+      const acc = String(row[4]).trim();
+      const pwd = String(row[5]).trim();
+      const atPos = acc.indexOf("@");
+      const accHint = atPos > 4 ? acc.substring(0, 4) + "*".repeat(atPos - 4) + acc.substring(atPos) : acc;
+      const pwdHint = pwd.length > 2 ? pwd[0] + "*".repeat(pwd.length - 2) + pwd[pwd.length - 1] : pwd;
+
       list.push({
         id: row[0],
         seat_number: String(row[2]).padStart(2, '0'),
-        name: String(row[3]).trim()
+        name: String(row[3]).trim(),
+        acc_hash: computeSha256(acc),
+        pwd_hash: computeSha256(pwd),
+        acc_len: acc.length,
+        pwd_len: pwd.length,
+        acc_hint: accHint,
+        pwd_hint: pwdHint
       });
     }
   }

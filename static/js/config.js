@@ -1,5 +1,5 @@
 // 🌐 Google Apps Script 部署後的 Web App URL
-const API_URL = 'https://script.google.com/macros/s/AKfycbzZ4FBD1roKxOceFCzqC3ze6nfC7jkv8ywoJ2ZnvYJfLRJGqxm_bhmTkVuiQvUF8ptL7Q/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxXfPiPX_4t4iPaHtb_ao1MCk12dme016V7HRAIkHkgcnKAR3f4XSFfayx92zk4vdq4LQ/exec';
 
 // 後端 API 發送輔助函式（Google Apps Script Web App 對 GET 支援最為完美且不會有 CORS 或 302 重定向丟失 body 問題）
 async function apiRequest(action, data = {}, method = 'GET') {
