@@ -3,8 +3,8 @@
 // ══════════════════════════════════════════════════
 
 // 填入您在 Supabase 專案建立後的 Project URL 與 anon public key：
-const SUPABASE_URL = 'https://YOUR-PROJECT-ID.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY';
+const SUPABASE_URL = 'https://tvzmludmmwnfdowzjssv.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_mGlw3yCWBAv_709kqwiRYw_MEq3R0FU';
 
 // 建立 Supabase Client 實例
 let supabaseClient = null;
