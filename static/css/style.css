@@ -909,6 +909,18 @@ body {
     background: #d63031;
 }
 
+.btn-success {
+    background: #00b894;
+    color: white;
+    font-weight: 600;
+}
+
+.btn-success:hover {
+    background: #00a383;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 184, 148, 0.3);
+}
+
 .admin-controls {
     display: flex;
     gap: 12px;

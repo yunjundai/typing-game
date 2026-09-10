@@ -313,6 +313,7 @@
                 </select>
                 <input type="text" id="search-practice-student" class="search-input" placeholder="🔍 搜尋姓名或座號..." oninput="filterPracticeStatus()">
                 <button class="btn btn-secondary" onclick="loadPracticeStatus()">🔄 重新整理狀況</button>
+                <button class="btn btn-success" onclick="exportPracticeToCSV()">📥 匯出成績表 (CSV/Excel)</button>
                 <span id="practice-summary" class="tag-count" style="margin-left: auto; background: #00b894;">統計中...</span>
             </div>
 
@@ -353,6 +354,7 @@
                     <option value="6">六年級</option>
                 </select>
                 <button class="btn btn-secondary" onclick="loadLeaderboardMgmt()">🔄 重新整理排行</button>
+                <button class="btn btn-success" onclick="exportLeaderboardToCSV()">📥 匯出排行 (CSV/Excel)</button>
                 <button class="btn btn-danger" style="margin-left: auto;" onclick="clearAllScoresForCurrentFilter()">⚠️ 清除目前條件所有成績</button>
             </div>
 
