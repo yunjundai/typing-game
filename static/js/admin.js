@@ -652,139 +652,197 @@ async function clearAllScoresForCurrentFilter() {
 
 // ── 通用 CSV 下載輔助函式（自動加入 UTF-8 BOM，防止 Excel 開啟中文亂碼） ──
 function downloadCSV(filename, rows) {
-    const processRow = (row) => row.map(val => {
-        let str = (val === null || val === undefined) ? '' : String(val);
-        // 如果包含逗號、引號或換行，以引號包覆並將內部引號跳脫成雙引號
-        if (str.search(/("|,|\n)/g) >= 0) {
-            str = '"' + str.replace(/"/g, '""') + '"';
-        }
-        return str;
-    }).join(',');
+    try {
+        const processRow = (row) => row.map(val => {
+            let str = (val === null || val === undefined) ? '' : String(val);
+            if (str.search(/("|,|\n|\r)/g) >= 0) {
+                str = '"' + str.replace(/"/g, '""') + '"';
+            }
+            return str;
+        }).join(',');
 
-    const csvContent = '\uFEFF' + rows.map(processRow).join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.setAttribute('download', filename);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+        const csvContent = '\uFEFF' + rows.map(processRow).join('\r\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        // 支援 IE / Edge 舊版或現代瀏覽器
+        if (navigator.msSaveBlob) {
+            navigator.msSaveBlob(blob, filename);
+            return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.setAttribute('download', filename);
+        document.body.appendChild(a);
+        a.click();
+        
+        // 延遲移除避免部分瀏覽器在下載前釋放
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 1000);
+    } catch (err) {
+        console.error('下載 CSV 失敗:', err);
+        alert('❌ 產生下載檔案失敗：' + err.message);
+    }
 }
 
-// ── 匯出學生練習狀況成績表 ──
-function exportPracticeToCSV() {
-    if (!allPracticeData || allPracticeData.length === 0) {
-        alert('目前尚無學生資料可供匯出，請先重新整理狀況！');
-        return;
+// ── 匯出學生練習狀況成績表（若尚未載入自動從 Supabase 即時取得） ──
+async function exportPracticeToCSV() {
+    const exportBtn = document.querySelector("button[onclick='exportPracticeToCSV()']");
+    const originalText = exportBtn ? exportBtn.innerHTML : '';
+    if (exportBtn) {
+        exportBtn.disabled = true;
+        exportBtn.innerHTML = '⏳ 匯出產製中...';
     }
 
-    const classFilter = document.getElementById('filter-practice-class')?.value || 'all';
-    const statusFilter = document.getElementById('filter-practice-status')?.value || 'all';
-    const searchFilter = document.getElementById('search-practice-student')?.value.trim().toLowerCase() || '';
-
-    // 依目前後台設定的篩選條件過濾要匯出的名單
-    const targetList = allPracticeData.filter(item => {
-        if (classFilter !== 'all' && String(item.class_name).trim() !== classFilter) return false;
-        if (statusFilter === 'done' && !item.hasPracticed) return false;
-        if (statusFilter === 'none' && item.hasPracticed) return false;
-        if (searchFilter) {
-            const matchName = String(item.name).toLowerCase().includes(searchFilter);
-            const matchSeat = String(item.seat_number).includes(searchFilter);
-            if (!matchName && !matchSeat) return false;
+    try {
+        // 如果目前記憶體尚未快取練習資料，自動即時載入
+        if (!allPracticeData || allPracticeData.length === 0) {
+            await loadPracticeStatus();
         }
-        return true;
-    });
 
-    if (targetList.length === 0) {
-        alert('目前篩選條件下沒有學生資料可匯出！');
-        return;
+        if (!allPracticeData || allPracticeData.length === 0) {
+            alert('⚠️ 無法取得學生資料，請確認網路連線或稍候再試！');
+            return;
+        }
+
+        const classFilter = document.getElementById('filter-practice-class')?.value || 'all';
+        const statusFilter = document.getElementById('filter-practice-status')?.value || 'all';
+        const searchFilter = document.getElementById('search-practice-student')?.value.trim().toLowerCase() || '';
+
+        // 依目前後台設定的篩選條件過濾要匯出的名單
+        const targetList = allPracticeData.filter(item => {
+            if (classFilter !== 'all' && String(item.class_name).trim() !== classFilter) return false;
+            if (statusFilter === 'done' && !item.hasPracticed) return false;
+            if (statusFilter === 'none' && item.hasPracticed) return false;
+            if (searchFilter) {
+                const matchName = String(item.name).toLowerCase().includes(searchFilter);
+                const matchSeat = String(item.seat_number).includes(searchFilter);
+                if (!matchName && !matchSeat) return false;
+            }
+            return true;
+        });
+
+        if (targetList.length === 0) {
+            alert('⚠️ 目前篩選條件下沒有學生資料可匯出！');
+            return;
+        }
+
+        // 準備 CSV 表頭與資料列
+        const headers = [
+            '班級',
+            '座號',
+            '姓名',
+            '練習狀態',
+            '累計練習次數',
+            '最高分紀錄',
+            '平均正確率(%)',
+            '最近練習時間'
+        ];
+
+        const rows = [headers];
+        targetList.forEach(s => {
+            rows.push([
+                s.class_name,
+                s.seat_number,
+                s.name,
+                s.hasPracticed ? '已完成練習' : '尚未練習',
+                s.practiceCount,
+                s.hasPracticed ? s.maxScore : 0,
+                s.hasPracticed ? `${s.avgAccuracy}%` : '-',
+                s.lastTime
+            ]);
+        });
+
+        // 檔名：竹東國小_學生打字練習成績表_[班級]_[日期].csv
+        const today = new Date().toISOString().slice(0, 10);
+        const classLabel = classFilter === 'all' ? '全部班級' : `${classFilter}班`;
+        const filename = `竹東國小_打字練習成績表_${classLabel}_${today}.csv`;
+
+        downloadCSV(filename, rows);
+    } catch (err) {
+        console.error('匯出練習表失敗:', err);
+        alert('❌ 匯出失敗：' + err.message);
+    } finally {
+        if (exportBtn) {
+            exportBtn.disabled = false;
+            exportBtn.innerHTML = originalText;
+        }
     }
-
-    // 準備 CSV 表頭與資料列
-    const headers = [
-        '班級',
-        '座號',
-        '姓名',
-        '練習狀態',
-        '累計練習次數',
-        '最高分紀錄',
-        '平均正確率(%)',
-        '最近練習時間'
-    ];
-
-    const rows = [headers];
-    targetList.forEach(s => {
-        rows.push([
-            s.class_name,
-            s.seat_number,
-            s.name,
-            s.hasPracticed ? '已完成練習' : '尚未練習',
-            s.practiceCount,
-            s.hasPracticed ? s.maxScore : 0,
-            s.hasPracticed ? `${s.avgAccuracy}%` : '-',
-            s.lastTime
-        ]);
-    });
-
-    // 檔名：竹東國小_學生打字練習狀況_[班級]_[日期].csv
-    const today = new Date().toISOString().slice(0, 10);
-    const classLabel = classFilter === 'all' ? '全部班級' : `${classFilter}班`;
-    const filename = `竹東國小_打字練習成績表_${classLabel}_${today}.csv`;
-
-    downloadCSV(filename, rows);
 }
 
 // ── 匯出排行榜成績表 ──
-function exportLeaderboardToCSV() {
-    if (!currentMgmtLeaderboardData || currentMgmtLeaderboardData.length === 0) {
-        alert('目前條件下尚無排行榜資料可供匯出！');
-        return;
+async function exportLeaderboardToCSV() {
+    const exportBtn = document.querySelector("button[onclick='exportLeaderboardToCSV()']");
+    const originalText = exportBtn ? exportBtn.innerHTML : '';
+    if (exportBtn) {
+        exportBtn.disabled = true;
+        exportBtn.innerHTML = '⏳ 匯出產製中...';
     }
 
-    const timeLimit = parseInt(document.getElementById('filter-mgmt-timelimit').value) || 60;
-    const grade = document.getElementById('filter-mgmt-grade').value;
-    const timeText = `${Math.round(timeLimit / 60)}分鐘挑戰`;
-    const gradeText = grade === 'all' ? '全部年級' : `${grade}年級`;
-
-    const headers = [
-        '排名',
-        '班級',
-        '姓名',
-        '得分',
-        '完成次數',
-        '正確率(%)',
-        '挑戰時限',
-        '測驗時間'
-    ];
-
-    const rows = [headers];
-    currentMgmtLeaderboardData.forEach((item, idx) => {
-        let dateStr = '-';
-        if (item.created_at) {
-            const d = new Date(item.created_at);
-            if (!isNaN(d.getTime())) {
-                const pad = (n) => String(n).padStart(2, '0');
-                dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-            }
+    try {
+        if (!currentMgmtLeaderboardData || currentMgmtLeaderboardData.length === 0) {
+            await loadLeaderboardMgmt();
         }
 
-        rows.push([
-            idx + 1,
-            item.class_name || '-',
-            item.student_name || '無名氏',
-            item.score,
-            item.rounds || 0,
-            `${item.accuracy || 100}%`,
-            timeText,
-            dateStr
-        ]);
-    });
+        if (!currentMgmtLeaderboardData || currentMgmtLeaderboardData.length === 0) {
+            alert('⚠️ 目前條件下尚無排行榜資料可供匯出！');
+            return;
+        }
 
-    const today = new Date().toISOString().slice(0, 10);
-    const filename = `竹東國小_打字排行榜_${gradeText}_${timeText}_${today}.csv`;
+        const timeLimit = parseInt(document.getElementById('filter-mgmt-timelimit').value) || 60;
+        const grade = document.getElementById('filter-mgmt-grade').value;
+        const timeText = `${Math.round(timeLimit / 60)}分鐘挑戰`;
+        const gradeText = grade === 'all' ? '全部年級' : `${grade}年級`;
 
-    downloadCSV(filename, rows);
+        const headers = [
+            '排名',
+            '班級',
+            '姓名',
+            '得分',
+            '完成次數',
+            '正確率(%)',
+            '挑戰時限',
+            '測驗時間'
+        ];
+
+        const rows = [headers];
+        currentMgmtLeaderboardData.forEach((item, idx) => {
+            let dateStr = '-';
+            if (item.created_at) {
+                const d = new Date(item.created_at);
+                if (!isNaN(d.getTime())) {
+                    const pad = (n) => String(n).padStart(2, '0');
+                    dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                }
+            }
+
+            rows.push([
+                idx + 1,
+                item.class_name || '-',
+                item.student_name || '無名氏',
+                item.score,
+                item.rounds || 0,
+                `${item.accuracy || 100}%`,
+                timeText,
+                dateStr
+            ]);
+        });
+
+        const today = new Date().toISOString().slice(0, 10);
+        const filename = `竹東國小_打字排行榜_${gradeText}_${timeText}_${today}.csv`;
+
+        downloadCSV(filename, rows);
+    } catch (err) {
+        console.error('匯出排行榜失敗:', err);
+        alert('❌ 匯出失敗：' + err.message);
+    } finally {
+        if (exportBtn) {
+            exportBtn.disabled = false;
+            exportBtn.innerHTML = originalText;
+        }
+    }
 }
