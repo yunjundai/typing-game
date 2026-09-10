@@ -757,10 +757,10 @@ async function exportPracticeToCSV() {
             ]);
         });
 
-        // 檔名：竹東國小_學生打字練習成績表_[班級]_[日期].csv
+        // 檔名：竹仁國小_學生打字練習成績表_[班級]_[日期].csv
         const today = new Date().toISOString().slice(0, 10);
         const classLabel = classFilter === 'all' ? '全部班級' : `${classFilter}班`;
-        const filename = `竹東國小_打字練習成績表_${classLabel}_${today}.csv`;
+        const filename = `竹仁國小_打字練習成績表_${classLabel}_${today}.csv`;
 
         downloadCSV(filename, rows);
     } catch (err) {
@@ -833,7 +833,7 @@ async function exportLeaderboardToCSV() {
         });
 
         const today = new Date().toISOString().slice(0, 10);
-        const filename = `竹東國小_打字排行榜_${gradeText}_${timeText}_${today}.csv`;
+        const filename = `竹仁國小_打字排行榜_${gradeText}_${timeText}_${today}.csv`;
 
         downloadCSV(filename, rows);
     } catch (err) {
