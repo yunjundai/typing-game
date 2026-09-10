@@ -250,46 +250,134 @@
 
 <!-- ═══════════════ 畫面八：教師管理面板 ═══════════════ -->
 <section id="screen-admin-dashboard" class="screen">
-    <div class="container" style="max-width: 1000px;">
+    <div class="container" style="max-width: 1050px;">
         <div class="admin-header">
             <div>
-                <h1 style="font-size: 1.8rem; color: #2d3436;">⚙️ 學生帳號密碼管理面板 <span id="student-count" class="tag-count">0 人</span></h1>
-                <p style="color: #636e72; font-size: 0.95rem; margin-top: 4px;">可直接查詢、新增或刪除學生資料</p>
+                <h1 style="font-size: 1.8rem; color: #2d3436;">⚙️ 教師管理總控制台</h1>
+                <p style="color: #636e72; font-size: 0.95rem; margin-top: 4px;">學生帳密維護、練習進度統計、成績排行榜管理</p>
             </div>
             <div>
-                <button class="btn btn-primary" onclick="openAddModal()">➕ 新增學生</button>
-                <button class="btn btn-outline" style="margin-left: 8px;" onclick="showScreen('screen-welcome')">🎮 返回遊戲</button>
+                <button class="btn btn-outline" onclick="showScreen('screen-welcome')">🎮 返回遊戲</button>
             </div>
         </div>
 
-        <!-- 篩選與搜尋工具列 -->
-        <div class="admin-controls">
-            <select id="filter-class" class="select-input" onchange="filterStudents()">
-                <option value="all">全部班級</option>
-            </select>
-            <input type="text" id="search-name" class="search-input" placeholder="🔍 搜尋姓名、座號或帳號..." oninput="filterStudents()">
-            <button class="btn btn-secondary" onclick="loadAllStudents()">🔄 重新整理</button>
+        <!-- 功能分頁切換按鈕 -->
+        <div class="admin-tabs">
+            <button class="admin-tab-btn active" onclick="switchAdminTab('tab-students', this)">📋 學生帳號密碼維護</button>
+            <button class="admin-tab-btn" onclick="switchAdminTab('tab-practice', this)">📊 學生練習狀況總覽</button>
+            <button class="admin-tab-btn" onclick="switchAdminTab('tab-leaderboard-mgmt', this)">🏆 排行榜資料管理</button>
         </div>
 
-        <!-- 學生資料表格 -->
-        <div class="admin-table-wrapper">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>班級</th>
-                        <th>座號</th>
-                        <th>姓名</th>
-                        <th>cjes 帳號</th>
-                        <th>cjes 密碼</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="admin-tbody">
-                    <tr><td colspan="7" style="padding: 30px; color: #b2bec3;">載入中...</td></tr>
-                </tbody>
-            </table>
+        <!-- ── TAB 1: 學生帳號密碼維護 ── -->
+        <div id="tab-students" class="admin-panel-view active">
+            <div class="admin-controls">
+                <select id="filter-class" class="select-input" onchange="filterStudents()">
+                    <option value="all">全部班級</option>
+                </select>
+                <input type="text" id="search-name" class="search-input" placeholder="🔍 搜尋姓名、座號或帳號..." oninput="filterStudents()">
+                <button class="btn btn-secondary" onclick="loadAllStudents()">🔄 重新整理</button>
+                <button class="btn btn-primary" style="margin-left: auto;" onclick="openAddModal()">➕ 新增學生</button>
+                <span id="student-count" class="tag-count">0 人</span>
+            </div>
+
+            <div class="admin-table-wrapper">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>班級</th>
+                            <th>座號</th>
+                            <th>姓名</th>
+                            <th>cjes 帳號</th>
+                            <th>cjes 密碼</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-tbody">
+                        <tr><td colspan="7" style="padding: 30px; color: #b2bec3;">載入中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
+
+        <!-- ── TAB 2: 所有學生練習狀況 ── -->
+        <div id="tab-practice" class="admin-panel-view">
+            <div class="admin-controls">
+                <select id="filter-practice-class" class="select-input" onchange="filterPracticeStatus()">
+                    <option value="all">全部班級</option>
+                </select>
+                <select id="filter-practice-status" class="select-input" onchange="filterPracticeStatus()">
+                    <option value="all">全部狀態 (已練 / 未練)</option>
+                    <option value="done">✅ 已完成練習</option>
+                    <option value="none">⚠️ 尚未練習</option>
+                </select>
+                <input type="text" id="search-practice-student" class="search-input" placeholder="🔍 搜尋姓名或座號..." oninput="filterPracticeStatus()">
+                <button class="btn btn-secondary" onclick="loadPracticeStatus()">🔄 重新整理狀況</button>
+                <span id="practice-summary" class="tag-count" style="margin-left: auto; background: #00b894;">統計中...</span>
+            </div>
+
+            <div class="admin-table-wrapper">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>班級</th>
+                            <th>座號</th>
+                            <th>姓名</th>
+                            <th>練習狀態</th>
+                            <th>累計練習次數</th>
+                            <th>最高分紀錄</th>
+                            <th>平均正確率</th>
+                            <th>最近練習時間</th>
+                        </tr>
+                    </thead>
+                    <tbody id="practice-tbody">
+                        <tr><td colspan="8" style="padding: 30px; color: #b2bec3;">載入中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ── TAB 3: 排行榜成績管理（支援單筆清除與全清） ── -->
+        <div id="tab-leaderboard-mgmt" class="admin-panel-view">
+            <div class="admin-controls">
+                <select id="filter-mgmt-timelimit" class="select-input" onchange="loadLeaderboardMgmt()">
+                    <option value="60">⏱️ 1 分鐘挑戰</option>
+                    <option value="180">⏱️ 3 分鐘挑戰</option>
+                    <option value="300">⏱️ 5 分鐘挑戰</option>
+                </select>
+                <select id="filter-mgmt-grade" class="select-input" onchange="loadLeaderboardMgmt()">
+                    <option value="all">全部年級</option>
+                    <option value="3">三年級</option>
+                    <option value="4">四年級</option>
+                    <option value="5">五年級</option>
+                    <option value="6">六年級</option>
+                </select>
+                <button class="btn btn-secondary" onclick="loadLeaderboardMgmt()">🔄 重新整理排行</button>
+                <button class="btn btn-danger" style="margin-left: auto;" onclick="clearAllScoresForCurrentFilter()">⚠️ 清除目前條件所有成績</button>
+            </div>
+
+            <div class="admin-table-wrapper">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>班級</th>
+                            <th>姓名</th>
+                            <th>分數</th>
+                            <th>完成次數</th>
+                            <th>正確率</th>
+                            <th>挑戰時間</th>
+                            <th>測驗時間</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mgmt-leaderboard-tbody">
+                        <tr><td colspan="9" style="padding: 30px; color: #b2bec3;">載入中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 </section>
 

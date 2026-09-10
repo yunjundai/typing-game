@@ -295,3 +295,353 @@ async function confirmDeleteStudent(id, name) {
         alert('❌ 網路請求失敗');
     }
 }
+
+/* ═══════════════════════════════════════════════
+   後台分頁切換與擴充功能 (Tab 控制)
+   ═══════════════════════════════════════════════ */
+
+let allPracticeData = []; // 儲存彙總後的學生練習紀錄
+let currentMgmtLeaderboardData = []; // 儲存當前排行榜管理資料
+
+function switchAdminTab(tabId, btn) {
+    // 切換按鈕 active 樣式
+    document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+
+    // 切換面板顯示
+    document.querySelectorAll('.admin-panel-view').forEach(panel => panel.classList.remove('active'));
+    const targetPanel = document.getElementById(tabId);
+    if (targetPanel) targetPanel.classList.add('active');
+
+    // 依據進入的分頁進行資料載入
+    if (tabId === 'tab-students') {
+        if (allStudentsList.length === 0) loadAllStudents();
+    } else if (tabId === 'tab-practice') {
+        loadPracticeStatus();
+    } else if (tabId === 'tab-leaderboard-mgmt') {
+        loadLeaderboardMgmt();
+    }
+}
+
+/* ═══════════════════════════════════════════════
+   功能 2：學生練習狀況總覽 (tab-practice)
+   ═══════════════════════════════════════════════ */
+
+async function loadPracticeStatus() {
+    const tbody = document.getElementById('practice-tbody');
+    const summaryBadge = document.getElementById('practice-summary');
+    tbody.innerHTML = '<tr><td colspan="8" style="padding: 30px; color: #b2bec3;">正在統整學生練習資料...</td></tr>';
+    summaryBadge.textContent = '統計中...';
+
+    try {
+        if (isSupabaseConfigured()) {
+            // 1. 取得所有學生名單
+            let students = allStudentsList;
+            if (!students || students.length === 0) {
+                const { data: stuData, error: stuErr } = await supabaseClient
+                    .from('students')
+                    .select('id, class_name, seat_number, name')
+                    .order('class_name', { ascending: true })
+                    .order('seat_number', { ascending: true });
+                if (stuErr) throw stuErr;
+                students = stuData || [];
+                allStudentsList = students;
+            }
+
+            // 2. 取得所有練習成績紀錄（只選取必要欄位以加速）
+            const { data: scoreData, error: scoreErr } = await supabaseClient
+                .from('scores')
+                .select('id, student_id, student_name, class_name, score, accuracy, created_at');
+            if (scoreErr) throw scoreErr;
+
+            // 3. 建立學生成績統計映射 (Map by student_id 或 name+class)
+            const scoreMap = new Map();
+            (scoreData || []).forEach(sc => {
+                // 優先使用 student_id，若無則依據 class_name + name
+                const key = sc.student_id ? `id_${sc.student_id}` : `key_${String(sc.class_name).trim()}_${String(sc.student_name).trim()}`;
+                if (!scoreMap.has(key)) {
+                    scoreMap.set(key, []);
+                }
+                scoreMap.get(key).push(sc);
+            });
+
+            // 4. 彙整每位學生的練習情況
+            allPracticeData = students.map(stu => {
+                const keyById = `id_${stu.id}`;
+                const keyByName = `key_${String(stu.class_name).trim()}_${String(stu.name).trim()}`;
+                const scores = scoreMap.get(keyById) || scoreMap.get(keyByName) || [];
+
+                const count = scores.length;
+                let maxScore = 0;
+                let avgAcc = 0;
+                let lastTime = '-';
+
+                if (count > 0) {
+                    maxScore = Math.max(...scores.map(s => Number(s.score) || 0));
+                    const totalAcc = scores.reduce((sum, s) => sum + (Number(s.accuracy) || 0), 0);
+                    avgAcc = Math.round(totalAcc / count);
+
+                    // 找出最新的時間
+                    const sortedDates = scores.map(s => new Date(s.created_at)).filter(d => !isNaN(d.getTime())).sort((a, b) => b - a);
+                    if (sortedDates.length > 0) {
+                        const d = sortedDates[0];
+                        const pad = (n) => String(n).padStart(2, '0');
+                        lastTime = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                    }
+                }
+
+                return {
+                    id: stu.id,
+                    class_name: stu.class_name,
+                    seat_number: stu.seat_number,
+                    name: stu.name,
+                    hasPracticed: count > 0,
+                    practiceCount: count,
+                    maxScore: maxScore,
+                    avgAccuracy: avgAcc,
+                    lastTime: lastTime
+                };
+            });
+
+            // 更新練習狀況專用班級選單
+            updatePracticeClassFilterOptions();
+            filterPracticeStatus();
+
+        } else {
+            tbody.innerHTML = '<tr><td colspan="8" style="color: #636e72; padding: 20px;">目前處於本機展示模式，請串接 Supabase 後使用此完整統計功能。</td></tr>';
+        }
+    } catch (err) {
+        console.error('統計學生練習狀況失敗:', err);
+        tbody.innerHTML = `<tr><td colspan="8" style="color: #d63031;">資料載入失敗: ${err.message || '連線異常'}</td></tr>`;
+    }
+}
+
+function updatePracticeClassFilterOptions() {
+    const select = document.getElementById('filter-practice-class');
+    if (!select) return;
+    const classes = [...new Set(allPracticeData.map(s => String(s.class_name).trim()))].sort();
+    
+    const currentVal = select.value;
+    select.innerHTML = '<option value="all">全部班級</option>';
+    classes.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = `${c} 班`;
+        select.appendChild(opt);
+    });
+    select.value = currentVal || 'all';
+}
+
+function filterPracticeStatus() {
+    const classFilter = document.getElementById('filter-practice-class')?.value || 'all';
+    const statusFilter = document.getElementById('filter-practice-status')?.value || 'all';
+    const searchFilter = document.getElementById('search-practice-student')?.value.trim().toLowerCase() || '';
+
+    // 統計當前所選班級的整體情況
+    const classBaseList = allPracticeData.filter(item => classFilter === 'all' || String(item.class_name).trim() === classFilter);
+    const practicedTotal = classBaseList.filter(s => s.hasPracticed).length;
+    const unpracticedTotal = classBaseList.length - practicedTotal;
+    const rate = classBaseList.length > 0 ? Math.round((practicedTotal / classBaseList.length) * 100) : 0;
+
+    const summaryBadge = document.getElementById('practice-summary');
+    if (summaryBadge) {
+        summaryBadge.textContent = `已練: ${practicedTotal} 人 / 未練: ${unpracticedTotal} 人 (完成率 ${rate}%)`;
+    }
+
+    // 依狀態與搜尋篩選呈現
+    const filtered = classBaseList.filter(item => {
+        if (statusFilter === 'done' && !item.hasPracticed) return false;
+        if (statusFilter === 'none' && item.hasPracticed) return false;
+        if (searchFilter) {
+            const matchName = String(item.name).toLowerCase().includes(searchFilter);
+            const matchSeat = String(item.seat_number).includes(searchFilter);
+            if (!matchName && !matchSeat) return false;
+        }
+        return true;
+    });
+
+    renderPracticeTable(filtered);
+}
+
+function renderPracticeTable(list) {
+    const tbody = document.getElementById('practice-tbody');
+    if (!tbody) return;
+
+    if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="padding: 30px; color: #b2bec3;">無符合條件的學生練習資料</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = list.map(stu => `
+        <tr>
+            <td><strong>${stu.class_name}</strong></td>
+            <td>${stu.seat_number}</td>
+            <td>${stu.name}</td>
+            <td>
+                ${stu.hasPracticed 
+                    ? '<span class="badge-practice-yes">✅ 已完成練習</span>' 
+                    : '<span class="badge-practice-no">⚠️ 尚未練習</span>'}
+            </td>
+            <td><strong style="color: ${stu.practiceCount > 0 ? '#0984e3' : '#b2bec3'};">${stu.practiceCount} 次</strong></td>
+            <td>${stu.hasPracticed ? `<span style="font-weight: 700; color: #d63031;">${stu.maxScore} 分</span>` : '-'}</td>
+            <td>${stu.hasPracticed ? `${stu.avgAccuracy}%` : '-'}</td>
+            <td style="font-size: 0.88rem; color: #636e72;">${stu.lastTime}</td>
+        </tr>
+    `).join('');
+}
+
+/* ═══════════════════════════════════════════════
+   功能 1：排行榜管理與成績清除 (tab-leaderboard-mgmt)
+   ═══════════════════════════════════════════════ */
+
+async function loadLeaderboardMgmt() {
+    const tbody = document.getElementById('mgmt-leaderboard-tbody');
+    tbody.innerHTML = '<tr><td colspan="9" style="padding: 30px; color: #b2bec3;">排行榜資料載入中...</td></tr>';
+
+    const timeLimit = parseInt(document.getElementById('filter-mgmt-timelimit').value) || 60;
+    const grade = document.getElementById('filter-mgmt-grade').value;
+
+    try {
+        if (isSupabaseConfigured()) {
+            let query = supabaseClient
+                .from('scores')
+                .select('id, student_name, class_name, score, rounds, accuracy, time_limit, created_at')
+                .eq('time_limit', timeLimit)
+                .order('score', { ascending: false })
+                .order('accuracy', { ascending: false })
+                .order('created_at', { ascending: true })
+                .limit(100);
+
+            if (grade !== 'all') {
+                query = query.like('class_name', `${grade}%`);
+            }
+
+            const { data, error } = await query;
+            if (error) throw error;
+
+            currentMgmtLeaderboardData = data || [];
+            renderMgmtLeaderboard(currentMgmtLeaderboardData);
+
+        } else {
+            tbody.innerHTML = '<tr><td colspan="9" style="color: #636e72; padding: 20px;">本機模式下無遠端資料庫紀錄</td></tr>';
+        }
+    } catch (err) {
+        console.error('載入排行榜管理資料失敗:', err);
+        tbody.innerHTML = `<tr><td colspan="9" style="color: #d63031;">載入失敗: ${err.message}</td></tr>`;
+    }
+}
+
+function renderMgmtLeaderboard(list) {
+    const tbody = document.getElementById('mgmt-leaderboard-tbody');
+    if (!tbody) return;
+
+    if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="padding: 30px; color: #b2bec3;">目前條件下尚無成績紀錄</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = list.map((item, index) => {
+        let rankBadge = `${index + 1}`;
+        if (index === 0) rankBadge = '🥇 1';
+        else if (index === 1) rankBadge = '🥈 2';
+        else if (index === 2) rankBadge = '🥉 3';
+
+        // 格式化測驗時間
+        let dateStr = '-';
+        if (item.created_at) {
+            const d = new Date(item.created_at);
+            if (!isNaN(d.getTime())) {
+                const pad = (n) => String(n).padStart(2, '0');
+                dateStr = `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            }
+        }
+
+        return `
+            <tr>
+                <td><strong>${rankBadge}</strong></td>
+                <td>${item.class_name || '-'}</td>
+                <td><strong>${item.student_name || '無名氏'}</strong></td>
+                <td><span style="font-weight: 700; color: #d63031;">${item.score}</span></td>
+                <td>${item.rounds || 0}</td>
+                <td>${item.accuracy || 100}%</td>
+                <td>${Math.round((item.time_limit || 60) / 60)} 分鐘</td>
+                <td style="font-size: 0.85rem; color: #636e72;">${dateStr}</td>
+                <td>
+                    <button class="btn-del" onclick="deleteSingleScore(${item.id}, '${item.student_name}', ${item.score})">🗑️ 清除</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// ── 單筆清除某項成績 ──
+async function deleteSingleScore(scoreId, studentName, score) {
+    if (!confirm(`確定要清除學生「${studentName}」的此筆成績（${score} 分）嗎？\n清除後將從排行榜移除！`)) {
+        return;
+    }
+
+    try {
+        if (isSupabaseConfigured()) {
+            const { error } = await supabaseClient
+                .from('scores')
+                .delete()
+                .eq('id', scoreId);
+
+            if (!error) {
+                alert('✅ 該筆成績已成功清除！');
+                loadLeaderboardMgmt();
+            } else {
+                alert('❌ 清除失敗：' + error.message);
+            }
+        } else {
+            alert('本機模式不支援刪除成績');
+        }
+    } catch (err) {
+        console.error('刪除成績失敗:', err);
+        alert('❌ 操作失敗，請檢查網路連線');
+    }
+}
+
+// ── 一鍵清空目前條件所有成績 ──
+async function clearAllScoresForCurrentFilter() {
+    const timeLimit = parseInt(document.getElementById('filter-mgmt-timelimit').value) || 60;
+    const grade = document.getElementById('filter-mgmt-grade').value;
+    const timeText = `${Math.round(timeLimit / 60)} 分鐘挑戰`;
+    const gradeText = grade === 'all' ? '全部年級' : `${grade} 年級`;
+
+    const confirmMsg = `⚠️【危險操作確認】\n您即將清除「${timeText}」且屬於「${gradeText}」的所有排行榜成績！\n\n此動作無法還原，請確認是否繼續？`;
+    if (!confirm(confirmMsg)) return;
+
+    // 二次輸入驗證以防誤按
+    const doubleCheck = prompt(`請輸入「清除」兩字以確認清空【${timeText} - ${gradeText}】的所有成績：`);
+    if (doubleCheck !== '清除') {
+        alert('操作已取消');
+        return;
+    }
+
+    try {
+        if (isSupabaseConfigured()) {
+            let query = supabaseClient
+                .from('scores')
+                .delete()
+                .eq('time_limit', timeLimit);
+
+            if (grade !== 'all') {
+                query = query.like('class_name', `${grade}%`);
+            }
+
+            const { error } = await query;
+            if (!error) {
+                alert(`✅ 已清空【${timeText} - ${gradeText}】的排行榜資料！`);
+                loadLeaderboardMgmt();
+            } else {
+                alert('❌ 清除失敗：' + error.message);
+            }
+        } else {
+            alert('本機展示模式不支援此操作');
+        }
+    } catch (err) {
+        console.error('清空成績失敗:', err);
+        alert('❌ 發生錯誤，請稍候再試');
+    }
+}

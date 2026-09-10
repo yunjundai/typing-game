@@ -840,6 +840,75 @@ body {
     gap: 12px;
 }
 
+.admin-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #edf2f7;
+    padding-bottom: 12px;
+}
+
+.admin-tab-btn {
+    border: none;
+    background: #f1f2f6;
+    color: #636e72;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.admin-tab-btn:hover {
+    background: #dfe6e9;
+    color: #2d3436;
+}
+
+.admin-tab-btn.active {
+    background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+    color: white;
+    box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
+}
+
+.admin-panel-view {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.admin-panel-view.active {
+    display: block;
+}
+
+.badge-practice-yes {
+    background: #e6fffa;
+    color: #00b894;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    display: inline-block;
+}
+
+.badge-practice-no {
+    background: #fff5f5;
+    color: #e17055;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.btn-danger {
+    background: #ff7675;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #d63031;
+}
+
 .admin-controls {
     display: flex;
     gap: 12px;
