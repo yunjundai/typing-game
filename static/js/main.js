@@ -179,7 +179,15 @@ function startGame(timeLimit) {
     updateTimerDisplay();
     document.getElementById('timer-bar').style.width = '100%';
     document.getElementById('timer-bar').className = 'timer-bar';
-    document.getElementById('game-input').value = '';
+
+    // 防 Chrome 自動填入：清空值、重設 readonly trick、刷新 autocomplete 屬性
+    const gi = document.getElementById('game-input');
+    gi.value = '';
+    gi.setAttribute('autocomplete', 'new-password');
+    gi.setAttribute('readonly', '');
+    // 延遲移除 readonly，避免頁面載入時 Chrome 填入
+    setTimeout(() => { gi.removeAttribute('readonly'); }, 100);
+
     document.getElementById('feedback').textContent = '';
     document.getElementById('feedback').className = 'feedback';
     document.getElementById('hint-area').style.display = 'none';
@@ -187,7 +195,9 @@ function startGame(timeLimit) {
 
     showCountdown(3, () => {
         state.gameActive = true;
-        document.getElementById('game-input').focus();
+        const gi2 = document.getElementById('game-input');
+        gi2.value = '';           // 再次確保倒數期間沒有被填入
+        gi2.focus();
         startTimer();
     });
 }
@@ -286,6 +296,15 @@ function updateGameUI() {
             toggleBtn.title = '顯示密碼';
         }
     }
+
+    // 防 Chrome 自動填入：每次切換欄位都強制清空並重設 readonly trick
+    input.value = '';
+    input.setAttribute('readonly', '');
+    setTimeout(() => {
+        input.removeAttribute('readonly');
+        input.value = ''; // 再次確保 readonly 移除後沒有殘留填入值
+        if (state.gameActive) input.focus();
+    }, 80);
 
     document.getElementById('hint-area').style.display = 'none';
     document.getElementById('hint-text').textContent = '';

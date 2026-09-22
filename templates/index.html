@@ -109,10 +109,15 @@
                     type="text"
                     id="game-input"
                     class="game-input"
-                    autocomplete="off"
+                    name="search_field"
+                    autocomplete="new-password"
                     autocapitalize="off"
                     autocorrect="off"
                     spellcheck="false"
+                    readonly
+                    onfocus="this.removeAttribute('readonly')"
+                    data-lpignore="true"
+                    data-form-type="other"
                     placeholder="在這裡輸入..."
                 >
                 <button type="button" id="btn-toggle-pwd" class="btn-toggle-pwd" onclick="togglePasswordVisibility()" title="顯示/隱藏密碼" style="display: none;">
