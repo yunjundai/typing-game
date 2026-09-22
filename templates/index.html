@@ -306,6 +306,12 @@
                 <select id="filter-practice-class" class="select-input" onchange="filterPracticeStatus()">
                     <option value="all">全部班級</option>
                 </select>
+                <select id="filter-practice-timelimit" class="select-input" onchange="reloadPracticeByTimeLimit()">
+                    <option value="all">全部時限</option>
+                    <option value="60">⏱️ 1 分鐘</option>
+                    <option value="180">⏱️ 3 分鐘</option>
+                    <option value="300">⏱️ 5 分鐘</option>
+                </select>
                 <select id="filter-practice-status" class="select-input" onchange="filterPracticeStatus()">
                     <option value="all">全部狀態 (已練 / 未練)</option>
                     <option value="done">✅ 已完成練習</option>

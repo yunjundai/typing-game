@@ -751,13 +751,18 @@ async function loadLeaderboard() {
                 query = query.like('class_name', `${state.leaderboardGrade}%`);
             }
 
-            const { data, error } = await query.limit(100);
+            // 拉取足夠多筆資料（最多 1000 筆）讓去重邏輯能覆蓋所有學生
+            const { data, error } = await query.limit(1000);
             if (!error && data) {
-                // 每位學生只取最高分
+                // 每位學生只保留最高分那筆（因資料已依 score DESC 排序，第一次出現的就是最高分）
                 const bestMap = {};
                 for (const row of data) {
-                    if (!bestMap[row.student_id]) {
-                        bestMap[row.student_id] = {
+                    // 若 student_id 為 null，用 class_name + student_name 作為備用 key
+                    const key = row.student_id
+                        ? `id_${row.student_id}`
+                        : `name_${String(row.class_name).trim()}_${String(row.student_name).trim()}`;
+                    if (!bestMap[key]) {
+                        bestMap[key] = {
                             name: row.student_name,
                             class_name: row.class_name,
                             score: row.score,
@@ -768,10 +773,14 @@ async function loadLeaderboard() {
                         };
                     }
                 }
-                results = Object.values(bestMap).slice(0, 50).map((item, idx) => {
-                    item.rank = idx + 1;
-                    return item;
-                });
+                // 去重後依分數再排序（避免 Map 插入順序問題），取前 50
+                results = Object.values(bestMap)
+                    .sort((a, b) => b.score - a.score || b.rounds - a.rounds)
+                    .slice(0, 50)
+                    .map((item, idx) => {
+                        item.rank = idx + 1;
+                        return item;
+                    });
             }
         } else {
             const res = await fetch(

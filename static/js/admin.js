@@ -327,11 +327,19 @@ function switchAdminTab(tabId, btn) {
    功能 2：學生練習狀況總覽 (tab-practice)
    ═══════════════════════════════════════════════ */
 
+// 時限選單變更時重新載入資料
+function reloadPracticeByTimeLimit() {
+    loadPracticeStatus();
+}
+
 async function loadPracticeStatus() {
     const tbody = document.getElementById('practice-tbody');
     const summaryBadge = document.getElementById('practice-summary');
     tbody.innerHTML = '<tr><td colspan="8" style="padding: 30px; color: #b2bec3;">正在統整學生練習資料...</td></tr>';
     summaryBadge.textContent = '統計中...';
+
+    // 讀取目前時限篩選值
+    const timeLimitVal = document.getElementById('filter-practice-timelimit')?.value || 'all';
 
     try {
         if (isSupabaseConfigured()) {
@@ -348,10 +356,17 @@ async function loadPracticeStatus() {
                 allStudentsList = students;
             }
 
-            // 2. 取得所有練習成績紀錄（只選取必要欄位以加速）
-            const { data: scoreData, error: scoreErr } = await supabaseClient
+            // 2. 取得練習成績紀錄（依時限篩選條件決定是否加 time_limit 條件）
+            let scoreQuery = supabaseClient
                 .from('scores')
-                .select('id, student_id, student_name, class_name, score, accuracy, created_at');
+                .select('id, student_id, student_name, class_name, score, accuracy, time_limit, created_at');
+
+            // 若有選擇特定時限，加入篩選條件
+            if (timeLimitVal !== 'all') {
+                scoreQuery = scoreQuery.eq('time_limit', parseInt(timeLimitVal));
+            }
+
+            const { data: scoreData, error: scoreErr } = await scoreQuery;
             if (scoreErr) throw scoreErr;
 
             // 3. 建立學生成績統計映射 (Map by student_id 或 name+class)
